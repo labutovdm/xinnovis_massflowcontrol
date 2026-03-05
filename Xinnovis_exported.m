@@ -2,7 +2,7 @@ classdef Xinnovis_exported < matlab.apps.AppBase
 
     % Properties that correspond to app components
     properties (Access = public)
-        XinnovisControlUIFigure         matlab.ui.Figure
+        XinnovisControlv15UIFigure      matlab.ui.Figure
         DeviceMenu                      matlab.ui.container.Menu
         FinddeviceMenu                  matlab.ui.container.Menu
         ConnectMenu                     matlab.ui.container.Menu
@@ -13,12 +13,15 @@ classdef Xinnovis_exported < matlab.apps.AppBase
         UnitsandgastypesMenu            matlab.ui.container.Menu
         HelpMenu                        matlab.ui.container.Menu
         AboutMenu                       matlab.ui.container.Menu
+        aboutme                         matlab.ui.control.Label
         Button_3                        matlab.ui.control.Button
         Button_2                        matlab.ui.control.Button
         Button                          matlab.ui.control.Button
         CurrentportisEditField          matlab.ui.control.EditField
         CurrentportisEditFieldLabel     matlab.ui.control.Label
         FinddevicePanel                 matlab.ui.container.Panel
+        DevicesDropDown                 matlab.ui.control.DropDown
+        DevicesDropDownLabel            matlab.ui.control.Label
         xButton                         matlab.ui.control.Button
         ApplyButton_4                   matlab.ui.control.Button
         FocusingIDDropDown              matlab.ui.control.DropDown
@@ -29,7 +32,6 @@ classdef Xinnovis_exported < matlab.apps.AppBase
         CarrierIDDropDownLabel          matlab.ui.control.Label
         COMportDropDown                 matlab.ui.control.DropDown
         COMportDropDownLabel            matlab.ui.control.Label
-        aboutme                         matlab.ui.control.Label
         Panel                           matlab.ui.container.Panel
         UnitsandgastypesPanel           matlab.ui.container.Panel
         UnitsEditField                  matlab.ui.control.EditField
@@ -41,8 +43,8 @@ classdef Xinnovis_exported < matlab.apps.AppBase
         Carriertemp                     matlab.ui.control.NumericEditField
         oCEditFieldLabel                matlab.ui.control.Label
         Carrierscale                    matlab.ui.control.NumericEditField
-        ApplyButton_3                   matlab.ui.control.Button
-        ZeroButton_3                    matlab.ui.control.Button
+        CarrierApply                    matlab.ui.control.Button
+        CarrierZero                     matlab.ui.control.Button
         sccmLabel_3                     matlab.ui.control.Label
         Carrierinput                    matlab.ui.control.NumericEditField
         MassflowsetpointEditField_3Label  matlab.ui.control.Label
@@ -62,8 +64,8 @@ classdef Xinnovis_exported < matlab.apps.AppBase
         oCEditFieldLabel_2              matlab.ui.control.Label
         Exhausttemp                     matlab.ui.control.NumericEditField
         Exhaustscale                    matlab.ui.control.NumericEditField
-        ApplyButton_2                   matlab.ui.control.Button
-        ZeroButton_2                    matlab.ui.control.Button
+        ExhaustApply                    matlab.ui.control.Button
+        ExhaustZero                     matlab.ui.control.Button
         sccmLabel_2                     matlab.ui.control.Label
         Exhaustinput                    matlab.ui.control.NumericEditField
         MassflowsetpointEditField_2Label  matlab.ui.control.Label
@@ -83,8 +85,8 @@ classdef Xinnovis_exported < matlab.apps.AppBase
         oCEditFieldLabel_3              matlab.ui.control.Label
         Focusingtemp                    matlab.ui.control.NumericEditField
         Focusingscale                   matlab.ui.control.NumericEditField
-        ApplyButton                     matlab.ui.control.Button
-        ZeroButton                      matlab.ui.control.Button
+        FocusingApply                   matlab.ui.control.Button
+        FocusingZero                    matlab.ui.control.Button
         sccmLabel                       matlab.ui.control.Label
         Focusinginput                   matlab.ui.control.NumericEditField
         MassflowsetpointEditFieldLabel  matlab.ui.control.Label
@@ -113,6 +115,9 @@ classdef Xinnovis_exported < matlab.apps.AppBase
         %Modbus settings
         m = [];
         port = 'COM1';
+
+        n = 3; %Devices number
+
         ID1 = 1;
         ID2 = 2;
         ID3 = 3;
@@ -142,7 +147,7 @@ classdef Xinnovis_exported < matlab.apps.AppBase
 
             IDs = [app.ID1 app.ID2 app.ID3];
 
-            for l = 1:1
+            for l = 1:app.n
                 try
                     % Example register map (adjust to your device)
                     data = read(app.m, 'holdingregs', 21, [2, 1, 1, 6, 1, 2], IDs(l), {'uint16', 'uint32', 'uint64', 'uint16', 'uint32', 'uint16'});
@@ -173,7 +178,7 @@ classdef Xinnovis_exported < matlab.apps.AppBase
 
             %Focusing gas
             app.FocusingSetpoint.Value = app.set(3);
-            app.FocusingMassflowrate.Value = app.read(3);
+            app.FocusingMassflowrate.Value = app.read(3)/10;
             app.FocusingTotal.Value = app.total(3);
 
             app.Carriertemp.Value = app.temp(1);
@@ -193,8 +198,8 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             % Create timer AFTER connection
             app.pollTimer = timer( ...
                 'ExecutionMode','fixedRate', ...
-                'Period',0.2, ...          % 200 ms cycle
-                'BusyMode','queue', ...
+                'Period',1, ...          % 500 ms cycle
+                'BusyMode','drop', ...
                 'TimerFcn',@(~,~)app.pollDevices());
 
             app.ConnectionLamp.Enable = "on";
@@ -202,13 +207,27 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             app.ConnectMenu.Enable = 'off';
             app.Button.Enable = "on";
             app.Button_2.Enable = "on";
+            app.FinddeviceMenu.Enable = "off";
         end
 
         % Menu selected function: ExitMenu
         function ExitMenuSelected(app, event)
+            write(app.m, 'holdingregs', 35, 0, app.ID1, 'uint32');
+            app.Carrierinput.Value = 0;
+
+            if app.n>1
+                write(app.m, 'holdingregs', 35, 0, app.ID2, 'uint32');
+                app.Exhaustinput.Value = 0;
+            end
+
+            if app.n>2
+                write(app.m, 'holdingregs', 35, 0, app.ID3, 'uint32');
+                app.Focusinginput.Value = 0;
+            end
+
             clear app.m
             app.ConnectionLamp.Enable = "off";
-            pause(0.2)
+            pause(0.1)
 
             if ~isempty(app.pollTimer) && isvalid(app.pollTimer)
                 stop(app.pollTimer);
@@ -236,7 +255,7 @@ classdef Xinnovis_exported < matlab.apps.AppBase
 
         % Menu selected function: ALARMMenu
         function ALARMMenuSelected(app, event)
-            uialert(app.XinnovisControlUIFigure, 'АХТУНГ БЛЯТЬ!!!!!', 'АШЫПКА НАХУЙ!!!')
+            uialert(app.XinnovisControlv15UIFigure, 'АХТУНГ БЛЯТЬ!!!!!', 'АШЫПКА НАХУЙ!!!')
         end
 
         % Menu selected function: UnitsandgastypesMenu
@@ -259,6 +278,19 @@ classdef Xinnovis_exported < matlab.apps.AppBase
                 app.isRunning = false;
             end
 
+            write(app.m, 'holdingregs', 35, 0, app.ID1, 'uint32');
+            app.Carrierinput.Value = 0;
+
+            if app.n>1
+                write(app.m, 'holdingregs', 35, 0, app.ID2, 'uint32');
+                app.Exhaustinput.Value = 0;
+            end
+
+            if app.n>2
+                write(app.m, 'holdingregs', 35, 0, app.ID3, 'uint32');
+                app.Focusinginput.Value = 0;
+            end
+
             clear app.m
 
             app.ConnectionLamp.Enable = "off";
@@ -266,13 +298,15 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             app.ConnectMenu.Enable = 'off';
             app.Panel.Visible = "off";
             app.FinddeviceMenu.Enable = "off";
+            app.Button.Enable = "off";
+            app.Button_2.Enable = "off";
         end
 
         % Button pushed function: Button
         function ButtonPushed(app, event)
             IDs = [app.ID1 app.ID2 app.ID3];
 
-            for k = 1:1
+            for k = 1:app.n
                 data = read(app.m, 'holdingregs', 4, [1, 2], IDs(k), {'int16', 'uint16'});
 
                 app.scale(k) = data(2);
@@ -314,8 +348,12 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             app.Focusinginput.Limits = [0 app.scale(3)];
 
             app.CarrierGas.Value = app.gas(1);
-            % app.ExhaustGas.Value = app.gas(2);
-            % app.FocusingGas.Value = app.gas(3);
+            if app.n > 1
+                app.ExhaustGas.Value = app.gas(2);
+            end
+            if app.n > 2
+                app.FocusingGas.Value = app.gas(3);
+            end
 
             app.Panel.Visible = "on";
         end
@@ -339,6 +377,15 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             app.ID3 = str2double(app.FocusingIDDropDown.Value);
 
             app.CurrentportisEditField.Value = app.port;
+            app.n = str2double(app.DevicesDropDown.Value);
+
+            if app.n > 1
+                app.ExhaustgasPanel.Enable = "on";
+            end
+
+            if app.n > 2
+                app.FocusinggasPanel.Enable = "on";
+            end
 
             app.ConnectMenu.Enable = "on";
             app.FinddevicePanel.Visible = "off";
@@ -352,22 +399,40 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             end
         end
 
-        % Value changed function: Focusinginput
-        function FocusinginputValueChanged(app, event)
-            value = app.Focusinginput.Value;
-            % write(app.m,'holdingregs',10,value,app.ID3);
-        end
-
-        % Callback function: ApplyButton_3, Carrierinput
+        % Callback function: CarrierApply, Carrierinput
         function CarriersetpointValueChanged(app, event)
             value = app.Carrierinput.Value*1e3;
-            write(app.m,'holdingregs', 35, value, 'uint32');
+            write(app.m,'holdingregs', 35, value, app.ID1, 'uint32');
         end
 
-        % Button pushed function: ZeroButton_3
-        function ZeroButton_3Pushed(app, event)
-            write(app.m,'holdingregs', 35, 0, 'uint32');
+        % Button pushed function: CarrierZero
+        function CarrierZeroPushed(app, event)
+            write(app.m,'holdingregs', 35, 0, app.ID1, 'uint32');
             app.Carrierinput.Value = 0;
+        end
+
+        % Callback function: ExhaustApply, Exhaustinput
+        function ExhaustinputValueChanged(app, event)
+            value = app.Exhaustinput.Value*1e3;
+            write(app.m,'holdingregs', 35, value, app.ID2, 'uint32');
+        end
+
+        % Button pushed function: ExhaustZero
+        function ExhaustZeroButtonPushed(app, event)
+            write(app.m,'holdingregs', 35, 0, app.ID2, 'uint32');
+            app.Exhaustinput.Value = 0;
+        end
+
+        % Callback function: FocusingApply, Focusinginput
+        function FocusinginputValueChanged(app, event)
+            value = app.Focusinginput.Value*1e3;
+            write(app.m,'holdingregs', 35, value, app.ID3, 'uint32');
+        end
+
+        % Button pushed function: FocusingZero
+        function FocusingZeroButtonPushed(app, event)
+            write(app.m,'holdingregs', 35, 0, app.ID3, 'uint32');
+            app.Focusinginput.Value = 0;
         end
     end
 
@@ -380,21 +445,22 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             % Get the file path for locating images
             pathToMLAPP = fileparts(mfilename('fullpath'));
 
-            % Create XinnovisControlUIFigure and hide until all components are created
-            app.XinnovisControlUIFigure = uifigure('Visible', 'off');
-            app.XinnovisControlUIFigure.Color = [0.2314 0.2314 0.2314];
-            app.XinnovisControlUIFigure.Position = [500 500 1280 720];
-            app.XinnovisControlUIFigure.Name = 'Xinnovis Control';
-            app.XinnovisControlUIFigure.Icon = fullfile(pathToMLAPP, 'xinnovis_logo.jpg');
-            app.XinnovisControlUIFigure.Resize = 'off';
+            % Create XinnovisControlv15UIFigure and hide until all components are created
+            app.XinnovisControlv15UIFigure = uifigure('Visible', 'off');
+            app.XinnovisControlv15UIFigure.Color = [0.2314 0.2314 0.2314];
+            app.XinnovisControlv15UIFigure.Position = [500 500 1280 720];
+            app.XinnovisControlv15UIFigure.Name = 'Xinnovis Control v.1.5';
+            app.XinnovisControlv15UIFigure.Icon = fullfile(pathToMLAPP, 'xinnovis_logo.jpg');
+            app.XinnovisControlv15UIFigure.Resize = 'off';
 
             % Create DeviceMenu
-            app.DeviceMenu = uimenu(app.XinnovisControlUIFigure);
+            app.DeviceMenu = uimenu(app.XinnovisControlv15UIFigure);
             app.DeviceMenu.Text = 'Device';
 
             % Create FinddeviceMenu
             app.FinddeviceMenu = uimenu(app.DeviceMenu);
             app.FinddeviceMenu.MenuSelectedFcn = createCallbackFcn(app, @FinddeviceMenuSelected, true);
+            app.FinddeviceMenu.Accelerator = 'F';
             app.FinddeviceMenu.Text = 'Find device';
 
             % Create ConnectMenu
@@ -409,7 +475,6 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             app.DisconnectMenu = uimenu(app.DeviceMenu);
             app.DisconnectMenu.MenuSelectedFcn = createCallbackFcn(app, @DisconnectMenuSelected, true);
             app.DisconnectMenu.Enable = 'off';
-            app.DisconnectMenu.Separator = 'on';
             app.DisconnectMenu.Accelerator = 'D';
             app.DisconnectMenu.Text = 'Disconnect';
 
@@ -427,17 +492,16 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             app.ExitMenu.Text = 'Exit';
 
             % Create PreferencesMenu
-            app.PreferencesMenu = uimenu(app.XinnovisControlUIFigure);
+            app.PreferencesMenu = uimenu(app.XinnovisControlv15UIFigure);
             app.PreferencesMenu.Text = 'Preferences';
 
             % Create UnitsandgastypesMenu
             app.UnitsandgastypesMenu = uimenu(app.PreferencesMenu);
             app.UnitsandgastypesMenu.MenuSelectedFcn = createCallbackFcn(app, @UnitsandgastypesMenuSelected, true);
-            app.UnitsandgastypesMenu.Enable = 'off';
             app.UnitsandgastypesMenu.Text = 'Units and gas types';
 
             % Create HelpMenu
-            app.HelpMenu = uimenu(app.XinnovisControlUIFigure);
+            app.HelpMenu = uimenu(app.XinnovisControlv15UIFigure);
             app.HelpMenu.Text = 'Help';
 
             % Create AboutMenu
@@ -446,7 +510,7 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             app.AboutMenu.Text = 'About';
 
             % Create ConnectionLampLabel
-            app.ConnectionLampLabel = uilabel(app.XinnovisControlUIFigure);
+            app.ConnectionLampLabel = uilabel(app.XinnovisControlv15UIFigure);
             app.ConnectionLampLabel.HorizontalAlignment = 'center';
             app.ConnectionLampLabel.FontName = 'Segoe UI Light';
             app.ConnectionLampLabel.FontColor = [0.9412 0.9412 0.9412];
@@ -454,22 +518,22 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             app.ConnectionLampLabel.Text = 'Connection';
 
             % Create ConnectionLamp
-            app.ConnectionLamp = uilamp(app.XinnovisControlUIFigure);
+            app.ConnectionLamp = uilamp(app.XinnovisControlv15UIFigure);
             app.ConnectionLamp.Enable = 'off';
             app.ConnectionLamp.Position = [1245 683 20 20];
 
             % Create Image
-            app.Image = uiimage(app.XinnovisControlUIFigure);
+            app.Image = uiimage(app.XinnovisControlv15UIFigure);
             app.Image.Position = [10 626 80 80];
             app.Image.ImageSource = fullfile(pathToMLAPP, 'xinnovis_logo.jpg');
 
             % Create Image2
-            app.Image2 = uiimage(app.XinnovisControlUIFigure);
+            app.Image2 = uiimage(app.XinnovisControlv15UIFigure);
             app.Image2.Position = [57 1 100 720];
             app.Image2.ImageSource = fullfile(pathToMLAPP, 'sep_white_1pt.svg');
 
             % Create Panel
-            app.Panel = uipanel(app.XinnovisControlUIFigure);
+            app.Panel = uipanel(app.XinnovisControlv15UIFigure);
             app.Panel.BorderColor = [0.2314 0.2314 0.2314];
             app.Panel.Visible = 'off';
             app.Panel.BackgroundColor = [0.2314 0.2314 0.2314];
@@ -495,6 +559,7 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             % Create FocusinggasPanel
             app.FocusinggasPanel = uipanel(app.Panel);
             app.FocusinggasPanel.BorderColor = [1 1 1];
+            app.FocusinggasPanel.Enable = 'off';
             app.FocusinggasPanel.ForegroundColor = [1 1 1];
             app.FocusinggasPanel.BorderWidth = 3;
             app.FocusinggasPanel.TitlePosition = 'centertop';
@@ -618,21 +683,23 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             app.sccmLabel.Position = [430 79 34 22];
             app.sccmLabel.Text = 'sccm';
 
-            % Create ZeroButton
-            app.ZeroButton = uibutton(app.FocusinggasPanel, 'push');
-            app.ZeroButton.BackgroundColor = [0.2314 0.2314 0.2314];
-            app.ZeroButton.FontName = 'Segoe UI Light';
-            app.ZeroButton.FontColor = [1 1 1];
-            app.ZeroButton.Position = [264 29 85 35];
-            app.ZeroButton.Text = 'Zero';
+            % Create FocusingZero
+            app.FocusingZero = uibutton(app.FocusinggasPanel, 'push');
+            app.FocusingZero.ButtonPushedFcn = createCallbackFcn(app, @FocusingZeroButtonPushed, true);
+            app.FocusingZero.BackgroundColor = [0.2314 0.2314 0.2314];
+            app.FocusingZero.FontName = 'Segoe UI Light';
+            app.FocusingZero.FontColor = [1 1 1];
+            app.FocusingZero.Position = [264 29 85 35];
+            app.FocusingZero.Text = 'Zero';
 
-            % Create ApplyButton
-            app.ApplyButton = uibutton(app.FocusinggasPanel, 'push');
-            app.ApplyButton.BackgroundColor = [0.7176 0.1137 0.1216];
-            app.ApplyButton.FontName = 'Segoe UI Light';
-            app.ApplyButton.FontColor = [1 1 1];
-            app.ApplyButton.Position = [379 29 85 35];
-            app.ApplyButton.Text = 'Apply';
+            % Create FocusingApply
+            app.FocusingApply = uibutton(app.FocusinggasPanel, 'push');
+            app.FocusingApply.ButtonPushedFcn = createCallbackFcn(app, @FocusinginputValueChanged, true);
+            app.FocusingApply.BackgroundColor = [0.7176 0.1137 0.1216];
+            app.FocusingApply.FontName = 'Segoe UI Light';
+            app.FocusingApply.FontColor = [1 1 1];
+            app.FocusingApply.Position = [379 29 85 35];
+            app.FocusingApply.Text = 'Apply';
 
             % Create Focusingscale
             app.Focusingscale = uieditfield(app.FocusinggasPanel, 'numeric');
@@ -661,6 +728,7 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             % Create ExhaustgasPanel
             app.ExhaustgasPanel = uipanel(app.Panel);
             app.ExhaustgasPanel.BorderColor = [1 1 1];
+            app.ExhaustgasPanel.Enable = 'off';
             app.ExhaustgasPanel.ForegroundColor = [1 1 1];
             app.ExhaustgasPanel.BorderWidth = 3;
             app.ExhaustgasPanel.TitlePosition = 'centertop';
@@ -769,6 +837,7 @@ classdef Xinnovis_exported < matlab.apps.AppBase
 
             % Create Exhaustinput
             app.Exhaustinput = uieditfield(app.ExhaustgasPanel, 'numeric');
+            app.Exhaustinput.ValueChangedFcn = createCallbackFcn(app, @ExhaustinputValueChanged, true);
             app.Exhaustinput.FontName = 'Segoe UI Light';
             app.Exhaustinput.FontSize = 14;
             app.Exhaustinput.FontColor = [0.4667 0.6745 0.1882];
@@ -783,21 +852,23 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             app.sccmLabel_2.Position = [430 79 34 22];
             app.sccmLabel_2.Text = 'sccm';
 
-            % Create ZeroButton_2
-            app.ZeroButton_2 = uibutton(app.ExhaustgasPanel, 'push');
-            app.ZeroButton_2.BackgroundColor = [0.2314 0.2314 0.2314];
-            app.ZeroButton_2.FontName = 'Segoe UI Light';
-            app.ZeroButton_2.FontColor = [1 1 1];
-            app.ZeroButton_2.Position = [264 29 85 35];
-            app.ZeroButton_2.Text = 'Zero';
+            % Create ExhaustZero
+            app.ExhaustZero = uibutton(app.ExhaustgasPanel, 'push');
+            app.ExhaustZero.ButtonPushedFcn = createCallbackFcn(app, @ExhaustZeroButtonPushed, true);
+            app.ExhaustZero.BackgroundColor = [0.2314 0.2314 0.2314];
+            app.ExhaustZero.FontName = 'Segoe UI Light';
+            app.ExhaustZero.FontColor = [1 1 1];
+            app.ExhaustZero.Position = [264 29 85 35];
+            app.ExhaustZero.Text = 'Zero';
 
-            % Create ApplyButton_2
-            app.ApplyButton_2 = uibutton(app.ExhaustgasPanel, 'push');
-            app.ApplyButton_2.BackgroundColor = [0.7176 0.1137 0.1216];
-            app.ApplyButton_2.FontName = 'Segoe UI Light';
-            app.ApplyButton_2.FontColor = [1 1 1];
-            app.ApplyButton_2.Position = [379 29 85 35];
-            app.ApplyButton_2.Text = 'Apply';
+            % Create ExhaustApply
+            app.ExhaustApply = uibutton(app.ExhaustgasPanel, 'push');
+            app.ExhaustApply.ButtonPushedFcn = createCallbackFcn(app, @ExhaustinputValueChanged, true);
+            app.ExhaustApply.BackgroundColor = [0.7176 0.1137 0.1216];
+            app.ExhaustApply.FontName = 'Segoe UI Light';
+            app.ExhaustApply.FontColor = [1 1 1];
+            app.ExhaustApply.Position = [379 29 85 35];
+            app.ExhaustApply.Text = 'Apply';
 
             % Create Exhaustscale
             app.Exhaustscale = uieditfield(app.ExhaustgasPanel, 'numeric');
@@ -949,23 +1020,23 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             app.sccmLabel_3.Position = [430 79 34 22];
             app.sccmLabel_3.Text = 'sccm';
 
-            % Create ZeroButton_3
-            app.ZeroButton_3 = uibutton(app.CarriergasPanel, 'push');
-            app.ZeroButton_3.ButtonPushedFcn = createCallbackFcn(app, @ZeroButton_3Pushed, true);
-            app.ZeroButton_3.BackgroundColor = [0.2314 0.2314 0.2314];
-            app.ZeroButton_3.FontName = 'Segoe UI Light';
-            app.ZeroButton_3.FontColor = [1 1 1];
-            app.ZeroButton_3.Position = [264 29 85 35];
-            app.ZeroButton_3.Text = 'Zero';
+            % Create CarrierZero
+            app.CarrierZero = uibutton(app.CarriergasPanel, 'push');
+            app.CarrierZero.ButtonPushedFcn = createCallbackFcn(app, @CarrierZeroPushed, true);
+            app.CarrierZero.BackgroundColor = [0.2314 0.2314 0.2314];
+            app.CarrierZero.FontName = 'Segoe UI Light';
+            app.CarrierZero.FontColor = [1 1 1];
+            app.CarrierZero.Position = [264 29 85 35];
+            app.CarrierZero.Text = 'Zero';
 
-            % Create ApplyButton_3
-            app.ApplyButton_3 = uibutton(app.CarriergasPanel, 'push');
-            app.ApplyButton_3.ButtonPushedFcn = createCallbackFcn(app, @CarriersetpointValueChanged, true);
-            app.ApplyButton_3.BackgroundColor = [0.7176 0.1137 0.1216];
-            app.ApplyButton_3.FontName = 'Segoe UI Light';
-            app.ApplyButton_3.FontColor = [1 1 1];
-            app.ApplyButton_3.Position = [379 29 85 35];
-            app.ApplyButton_3.Text = 'Apply';
+            % Create CarrierApply
+            app.CarrierApply = uibutton(app.CarriergasPanel, 'push');
+            app.CarrierApply.ButtonPushedFcn = createCallbackFcn(app, @CarriersetpointValueChanged, true);
+            app.CarrierApply.BackgroundColor = [0.7176 0.1137 0.1216];
+            app.CarrierApply.FontName = 'Segoe UI Light';
+            app.CarrierApply.FontColor = [1 1 1];
+            app.CarrierApply.Position = [379 29 85 35];
+            app.CarrierApply.Text = 'Apply';
 
             % Create Carrierscale
             app.Carrierscale = uieditfield(app.CarriergasPanel, 'numeric');
@@ -1033,20 +1104,8 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             app.UnitsEditField.Editable = 'off';
             app.UnitsEditField.Position = [117 92 100 22];
 
-            % Create aboutme
-            app.aboutme = uilabel(app.XinnovisControlUIFigure);
-            app.aboutme.BackgroundColor = [0.302 0.302 0.302];
-            app.aboutme.HorizontalAlignment = 'center';
-            app.aboutme.FontName = 'Segoe UI';
-            app.aboutme.FontSize = 14;
-            app.aboutme.FontColor = [1 1 1];
-            app.aboutme.Enable = 'off';
-            app.aboutme.Visible = 'off';
-            app.aboutme.Position = [108 217 1109 305];
-            app.aboutme.Text = {'Xinnovis Mass Flow Control software v.0.1'; ''; ''; 'This program is designed to accurately operate Xinnovis S500 Mass Flow Controllers with better experience than original shitsoft from manufacturer.'; ''; 'THE SOFTWARE IS PROVIDED ''AS IS'', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, '; 'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, '; 'DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH '; 'THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.'; ''; 'Copyright: D.A. Labutov, MIPT'; ''; 'Credits and requests: labutov.da@phystech.edu'};
-
             % Create FinddevicePanel
-            app.FinddevicePanel = uipanel(app.XinnovisControlUIFigure);
+            app.FinddevicePanel = uipanel(app.XinnovisControlv15UIFigure);
             app.FinddevicePanel.ForegroundColor = [0 0.4471 0.7412];
             app.FinddevicePanel.BorderWidth = 5;
             app.FinddevicePanel.TitlePosition = 'centertop';
@@ -1056,58 +1115,58 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             app.FinddevicePanel.FontName = 'Segoe UI Light';
             app.FinddevicePanel.FontWeight = 'bold';
             app.FinddevicePanel.FontSize = 14;
-            app.FinddevicePanel.Position = [125 409 250 300];
+            app.FinddevicePanel.Position = [125 403 250 300];
 
             % Create COMportDropDownLabel
             app.COMportDropDownLabel = uilabel(app.FinddevicePanel);
             app.COMportDropDownLabel.FontName = 'Segoe UI';
-            app.COMportDropDownLabel.Position = [35 201 58 22];
+            app.COMportDropDownLabel.Position = [35 230 58 22];
             app.COMportDropDownLabel.Text = 'COM port';
 
             % Create COMportDropDown
             app.COMportDropDown = uidropdown(app.FinddevicePanel);
             app.COMportDropDown.Items = {'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'COM10', 'COM11', 'COM12', 'COM13', 'COM14', 'COM15', 'COM16', 'COM17', 'COM18', 'COM19', 'COM20'};
             app.COMportDropDown.FontName = 'Segoe UI';
-            app.COMportDropDown.Position = [107 201 100 22];
+            app.COMportDropDown.Position = [107 230 100 22];
             app.COMportDropDown.Value = 'COM9';
 
             % Create CarrierIDDropDownLabel
             app.CarrierIDDropDownLabel = uilabel(app.FinddevicePanel);
             app.CarrierIDDropDownLabel.FontName = 'Segoe UI';
-            app.CarrierIDDropDownLabel.Position = [35 162 55 22];
+            app.CarrierIDDropDownLabel.Position = [35 147 55 22];
             app.CarrierIDDropDownLabel.Text = 'Carrier ID';
 
             % Create CarrierIDDropDown
             app.CarrierIDDropDown = uidropdown(app.FinddevicePanel);
             app.CarrierIDDropDown.Items = {'1', '2', '3', '4', '5', '6', '7', '8', '9', '10'};
             app.CarrierIDDropDown.FontName = 'Segoe UI';
-            app.CarrierIDDropDown.Position = [107 162 100 22];
+            app.CarrierIDDropDown.Position = [107 150 100 22];
             app.CarrierIDDropDown.Value = '1';
 
             % Create ExhaustIDDropDownLabel
             app.ExhaustIDDropDownLabel = uilabel(app.FinddevicePanel);
             app.ExhaustIDDropDownLabel.FontName = 'Segoe UI';
-            app.ExhaustIDDropDownLabel.Position = [35 124 57 22];
+            app.ExhaustIDDropDownLabel.Position = [35 109 57 22];
             app.ExhaustIDDropDownLabel.Text = 'ExhaustID';
 
             % Create ExhaustIDDropDown
             app.ExhaustIDDropDown = uidropdown(app.FinddevicePanel);
             app.ExhaustIDDropDown.Items = {'1', '2', '3', '4', '5', '6', '7', '8', '9', '10'};
             app.ExhaustIDDropDown.FontName = 'Segoe UI';
-            app.ExhaustIDDropDown.Position = [107 124 100 22];
+            app.ExhaustIDDropDown.Position = [107 110 100 22];
             app.ExhaustIDDropDown.Value = '2';
 
             % Create FocusingIDDropDownLabel
             app.FocusingIDDropDownLabel = uilabel(app.FinddevicePanel);
             app.FocusingIDDropDownLabel.FontName = 'Segoe UI';
-            app.FocusingIDDropDownLabel.Position = [35 86 67 22];
+            app.FocusingIDDropDownLabel.Position = [35 71 67 22];
             app.FocusingIDDropDownLabel.Text = 'Focusing ID';
 
             % Create FocusingIDDropDown
             app.FocusingIDDropDown = uidropdown(app.FinddevicePanel);
             app.FocusingIDDropDown.Items = {'1', '2', '3', '4', '5', '6', '7', '8', '9', '10'};
             app.FocusingIDDropDown.FontName = 'Segoe UI';
-            app.FocusingIDDropDown.Position = [107 86 100 22];
+            app.FocusingIDDropDown.Position = [107 71 100 22];
             app.FocusingIDDropDown.Value = '3';
 
             % Create ApplyButton_4
@@ -1127,8 +1186,22 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             app.xButton.Position = [218 268 25 25];
             app.xButton.Text = 'x';
 
+            % Create DevicesDropDownLabel
+            app.DevicesDropDownLabel = uilabel(app.FinddevicePanel);
+            app.DevicesDropDownLabel.FontName = 'Segoe UI';
+            app.DevicesDropDownLabel.Position = [36 189 45 22];
+            app.DevicesDropDownLabel.Text = 'Devices';
+
+            % Create DevicesDropDown
+            app.DevicesDropDown = uidropdown(app.FinddevicePanel);
+            app.DevicesDropDown.Items = {'one', 'two', 'three'};
+            app.DevicesDropDown.ItemsData = {'1', '2', '3'};
+            app.DevicesDropDown.FontName = 'Segoe UI';
+            app.DevicesDropDown.Position = [108 190 100 22];
+            app.DevicesDropDown.Value = '1';
+
             % Create CurrentportisEditFieldLabel
-            app.CurrentportisEditFieldLabel = uilabel(app.XinnovisControlUIFigure);
+            app.CurrentportisEditFieldLabel = uilabel(app.XinnovisControlv15UIFigure);
             app.CurrentportisEditFieldLabel.HorizontalAlignment = 'right';
             app.CurrentportisEditFieldLabel.FontName = 'Segoe UI Light';
             app.CurrentportisEditFieldLabel.FontColor = [0.9412 0.9412 0.9412];
@@ -1136,7 +1209,7 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             app.CurrentportisEditFieldLabel.Text = 'Current port is';
 
             % Create CurrentportisEditField
-            app.CurrentportisEditField = uieditfield(app.XinnovisControlUIFigure, 'text');
+            app.CurrentportisEditField = uieditfield(app.XinnovisControlv15UIFigure, 'text');
             app.CurrentportisEditField.Editable = 'off';
             app.CurrentportisEditField.FontName = 'Segoe UI Light';
             app.CurrentportisEditField.FontWeight = 'bold';
@@ -1146,7 +1219,7 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             app.CurrentportisEditField.Value = 'null';
 
             % Create Button
-            app.Button = uibutton(app.XinnovisControlUIFigure, 'push');
+            app.Button = uibutton(app.XinnovisControlv15UIFigure, 'push');
             app.Button.ButtonPushedFcn = createCallbackFcn(app, @ButtonPushed, true);
             app.Button.Icon = fullfile(pathToMLAPP, 'MFC_icon_white.svg');
             app.Button.BackgroundColor = [0.2314 0.2314 0.2314];
@@ -1158,7 +1231,7 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             app.Button.Text = '';
 
             % Create Button_2
-            app.Button_2 = uibutton(app.XinnovisControlUIFigure, 'push');
+            app.Button_2 = uibutton(app.XinnovisControlv15UIFigure, 'push');
             app.Button_2.ButtonPushedFcn = createCallbackFcn(app, @Button_2Pushed, true);
             app.Button_2.Icon = fullfile(pathToMLAPP, 'start.svg');
             app.Button_2.BackgroundColor = [0.2314 0.2314 0.2314];
@@ -1170,7 +1243,7 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             app.Button_2.Text = '';
 
             % Create Button_3
-            app.Button_3 = uibutton(app.XinnovisControlUIFigure, 'push');
+            app.Button_3 = uibutton(app.XinnovisControlv15UIFigure, 'push');
             app.Button_3.ButtonPushedFcn = createCallbackFcn(app, @AboutMenuSelected, true);
             app.Button_3.BackgroundColor = [0.2314 0.2314 0.2314];
             app.Button_3.FontName = 'Segoe UI Light';
@@ -1181,8 +1254,20 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             app.Button_3.Position = [7 191 86 80];
             app.Button_3.Text = '?';
 
+            % Create aboutme
+            app.aboutme = uilabel(app.XinnovisControlv15UIFigure);
+            app.aboutme.BackgroundColor = [0.302 0.302 0.302];
+            app.aboutme.HorizontalAlignment = 'center';
+            app.aboutme.FontName = 'Segoe UI';
+            app.aboutme.FontSize = 14;
+            app.aboutme.FontColor = [1 1 1];
+            app.aboutme.Enable = 'off';
+            app.aboutme.Visible = 'off';
+            app.aboutme.Position = [108 208 1109 305];
+            app.aboutme.Text = {'Xinnovis Mass Flow Control software v.1.5'; ''; ''; 'This program is designed to accurately operate Xinnovis S500 Mass Flow Controllers with better experience than original shitsoft from manufacturer.'; ''; 'THE SOFTWARE IS PROVIDED ''AS IS'', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, '; 'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, '; 'DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH '; 'THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.'; ''; 'Copyright: D.A. Labutov, MIPT'; ''; 'Credits and requests: labutov.da@phystech.edu'};
+
             % Create ContextMenu
-            app.ContextMenu = uicontextmenu(app.XinnovisControlUIFigure);
+            app.ContextMenu = uicontextmenu(app.XinnovisControlv15UIFigure);
 
             % Create CloseMenu
             app.CloseMenu = uimenu(app.ContextMenu);
@@ -1193,7 +1278,7 @@ classdef Xinnovis_exported < matlab.apps.AppBase
             app.aboutme.ContextMenu = app.ContextMenu;
 
             % Show the figure after all components are created
-            app.XinnovisControlUIFigure.Visible = 'on';
+            app.XinnovisControlv15UIFigure.Visible = 'on';
         end
     end
 
@@ -1212,11 +1297,11 @@ classdef Xinnovis_exported < matlab.apps.AppBase
                 createComponents(app)
 
                 % Register the app with App Designer
-                registerApp(app, app.XinnovisControlUIFigure)
+                registerApp(app, app.XinnovisControlv15UIFigure)
             else
 
                 % Focus the running singleton app
-                figure(runningApp.XinnovisControlUIFigure)
+                figure(runningApp.XinnovisControlv15UIFigure)
 
                 app = runningApp;
             end
@@ -1230,7 +1315,7 @@ classdef Xinnovis_exported < matlab.apps.AppBase
         function delete(app)
 
             % Delete UIFigure when app is deleted
-            delete(app.XinnovisControlUIFigure)
+            delete(app.XinnovisControlv15UIFigure)
         end
     end
 end
